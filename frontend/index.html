@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SANDMARK</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>SANDMARK</h1>
+        <p class="subtitle">Sandra Benchmark — AI Code Review Testing</p>
+    </header>
+
+    <main>
+        <!-- Controls Panel -->
+        <section class="controls">
+            <div class="control-group">
+                <label for="mr-url">GitLab Merge Request URL</label>
+                <input type="url" id="mr-url" placeholder="https://gitlab.com/group/project/-/merge_requests/123">
+            </div>
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="prompt-select">Master Prompt</label>
+                    <select id="prompt-select">
+                        <option value="">Loading prompts...</option>
+                    </select>
+                </div>
+                <div class="control-group control-buttons">
+                    <button id="btn-fetch-diff" class="btn btn-secondary">Fetch Diff</button>
+                    <button id="btn-run-review" class="btn btn-primary" disabled>Test Review</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Error display -->
+        <div id="error-banner" class="error-banner" hidden></div>
+
+        <!-- Loading indicator -->
+        <div id="loading" class="loading" hidden>
+            <div class="spinner"></div>
+            <span>Processing...</span>
+        </div>
+
+        <!-- Stats -->
+        <section id="stats-section" class="stats" hidden>
+            <div class="stat-card">
+                <span class="stat-label">Tokens Used</span>
+                <span class="stat-value" id="stat-tokens">—</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Time</span>
+                <span class="stat-value" id="stat-time">—</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Comments</span>
+                <span class="stat-value" id="stat-comments">—</span>
+            </div>
+        </section>
+
+        <!-- Summary -->
+        <section id="summary-section" class="summary" hidden>
+            <h2>Review Summary</h2>
+            <p id="review-summary"></p>
+        </section>
+
+        <!-- Diff + Review Display -->
+        <section id="diff-section" class="diff-section" hidden>
+            <h2>Diff &amp; Review Comments</h2>
+            <div id="diff-container"></div>
+        </section>
+
+        <!-- Logs -->
+        <section class="logs-section">
+            <div class="logs-header">
+                <h2>Logs</h2>
+                <div class="logs-actions">
+                    <button id="btn-copy-csv" class="btn btn-small">Copy CSV</button>
+                    <button id="btn-download-csv" class="btn btn-small">Download CSV</button>
+                </div>
+            </div>
+            <table id="logs-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Prompt</th>
+                        <th>MR URL</th>
+                        <th>Tokens</th>
+                        <th>Time (s)</th>
+                        <th>Summary</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-body">
+                    <tr><td colspan="6" class="empty-logs">No reviews yet.</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
