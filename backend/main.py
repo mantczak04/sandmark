@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
-from backend.models import DiffRequest, LogEntry, ReviewRequest
+from backend.models import DiffRequest, LogEntry, MongoLogEntry, ReviewRequest
 from backend.gitlab_client import fetch_mr_diff
 from backend.llm_client import run_review
 from backend import logs
@@ -60,6 +60,7 @@ async def run_review_endpoint(req: ReviewRequest):
         raise HTTPException(status_code=400, detail="Invalid prompt name.")
 
     prompt_text = prompt_path.read_text(encoding="utf-8")
+    prompt_hash = logs.compute_prompt_hash(prompt_text)
 
     # Fetch diff
     try:
@@ -75,7 +76,7 @@ async def run_review_endpoint(req: ReviewRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM review failed: {e}")
 
-    # Store log
+    # Store log in-memory (backward compatible)
     log_entry = LogEntry(
         timestamp=datetime.now(timezone.utc).isoformat(),
         prompt_name=req.prompt_name,
@@ -84,15 +85,24 @@ async def run_review_endpoint(req: ReviewRequest):
         time_seconds=result["time_seconds"],
         summary=result["review"].get("summary", ""),
     )
-    logs.add_log(log_entry)
+    
+    # Store log in MongoDB with extended fields
+    mongo_log_entry = MongoLogEntry.from_log_entry(
+        log_entry=log_entry,
+        prompt_hash=prompt_hash,
+        llm_model="gemini-3.1-flash-lite-preview",
+        review_json=result["review"]
+    )
+    
+    logs.add_log_dual(log_entry, mongo_log_entry)
 
     return result
 
 
 @app.get("/api/logs")
 def get_logs():
-    """Return all stored log entries."""
-    return {"logs": logs.get_logs()}
+    """Return all stored log entries from MongoDB (with in-memory fallback)."""
+    return {"logs": logs.get_logs_with_fallback()}
 
 
 @app.get("/api/logs/csv")

@@ -6,6 +6,7 @@ Prosta aplikacja do pobierania diffa z GitLab MR i uruchamiania review przez Gem
 
 - Python 3.11+ (zalecane)
 - Klucz API Gemini (`GEMINI_API_KEY`)
+- MongoDB Atlas account i connection string (`MONGODB_URI`)
 - (Opcjonalnie) token GitLab (`GITLAB_TOKEN`) dla prywatnych repozytoriów
 
 ## 1) Instalacja lokalna
@@ -26,11 +27,13 @@ W głównym katalogu projektu utwórz plik `.env`:
 GEMINI_API_KEY=twoj_klucz_gemini
 GITLAB_URL=https://gitlab.com
 GITLAB_TOKEN=
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true&w=majority
 ```
 
 Uwagi:
 - `GITLAB_TOKEN` może być pusty dla publicznych MR.
 - Dla self-hosted GitLaba ustaw własny `GITLAB_URL` (np. `https://gitlab.twojafirma.local`).
+- `MONGODB_URI` - connection string z MongoDB Atlas. Aplikacja będzie przechowywać logi w MongoDB. Jeśli połączenie nie powiedzie się, logi będą zapisywane tylko w pamięci.
 
 ## 3) Uruchomienie backendu
 
