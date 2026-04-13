@@ -21,10 +21,24 @@
             </div>
             <div class="control-row">
                 <div class="control-group">
-                    <label for="prompt-select">Master Prompt</label>
-                    <select id="prompt-select">
-                        <option value="">Loading prompts...</option>
-                    </select>
+                    <label>Master Prompt</label>
+                    <div class="prompt-tabs">
+                        <button id="prompt-tab-select" class="prompt-tab active" type="button">Select prompt</button>
+                        <button id="prompt-tab-custom" class="prompt-tab" type="button">Custom prompt</button>
+                    </div>
+                    <div id="prompt-panel-select" class="prompt-panel">
+                        <label for="prompt-select" class="sr-only">Master Prompt</label>
+                        <select id="prompt-select">
+                            <option value="">Loading prompts...</option>
+                        </select>
+                    </div>
+                    <div id="prompt-panel-custom" class="prompt-panel" hidden>
+                        <label for="custom-prompt-name">Prompt filename</label>
+                        <input type="text" id="custom-prompt-name" placeholder="my_custom_prompt.txt">
+                        <label for="custom-prompt-content">Prompt content</label>
+                        <textarea id="custom-prompt-content" rows="8" placeholder="Write your custom master prompt here..."></textarea>
+                        <button id="btn-save-prompt" class="btn btn-secondary" type="button">Save Prompt</button>
+                    </div>
                 </div>
                 <div class="control-group control-buttons">
                     <button id="btn-fetch-diff" class="btn btn-secondary">Fetch Diff</button>

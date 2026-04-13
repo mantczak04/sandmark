@@ -60,7 +60,8 @@ main {
 }
 
 .control-group input,
-.control-group select {
+.control-group select,
+.control-group textarea {
     width: 100%;
     padding: 0.5rem 0.75rem;
     background: #0d1117;
@@ -71,10 +72,18 @@ main {
 }
 
 .control-group input:focus,
-.control-group select:focus {
+.control-group select:focus,
+.control-group textarea:focus {
     outline: none;
     border-color: #58a6ff;
     box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+
+.control-group textarea {
+    resize: vertical;
+    min-height: 140px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.82rem;
 }
 
 .control-row {
@@ -85,6 +94,35 @@ main {
 
 .control-row .control-group {
     flex: 1;
+}
+
+.prompt-tabs {
+    display: inline-flex;
+    gap: 0.35rem;
+    margin-bottom: 0.6rem;
+}
+
+.prompt-tab {
+    padding: 0.35rem 0.7rem;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #0d1117;
+    color: #8b949e;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.prompt-tab.active {
+    color: #c9d1d9;
+    background: #1c2128;
+    border-color: #58a6ff;
+}
+
+.prompt-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .control-buttons {
@@ -384,4 +422,26 @@ main {
     text-align: center;
     color: #484f58 !important;
     padding: 2rem !important;
+}
+
+.error-logs {
+        text-align: center;
+        color: #f85149 !important;
+        padding: 2rem !important;
+    }
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+[hidden] {
+    display: none !important;
 }

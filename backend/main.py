@@ -10,10 +10,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
-from backend.models import DiffRequest, LogEntry, MongoLogEntry, ReviewRequest
+from backend.models import CreatePromptRequest, DiffRequest, LogEntry, MongoLogEntry, ReviewRequest
 from backend.gitlab_client import fetch_mr_diff
 from backend.llm_client import run_review
 from backend import logs
+from backend import mongodb_client
 
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
@@ -27,6 +28,17 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def startup_event():
+    """Validate MongoDB connection at app startup."""
+    is_connected, message = mongodb_client.validate_connection()
+    if is_connected:
+        print(f"✓ {message}")
+    else:
+        print(f"⚠ {message}")
+        print("  Logs will fall back to in-memory storage.")
+
+
 @app.get("/api/prompts")
 def list_prompts():
     """List all available master prompt files."""
@@ -34,6 +46,42 @@ def list_prompts():
         return {"prompts": []}
     prompt_files = sorted(f.name for f in PROMPTS_DIR.glob("*.txt"))
     return {"prompts": prompt_files}
+
+
+@app.post("/api/prompts")
+def create_prompt(req: CreatePromptRequest):
+    """Create a new prompt file in prompts directory."""
+    prompt_name = req.prompt_name.strip()
+    if not prompt_name:
+        raise HTTPException(status_code=400, detail="Prompt name is required.")
+    if "/" in prompt_name or "\\" in prompt_name:
+        raise HTTPException(status_code=400, detail="Prompt name cannot contain path separators.")
+    if prompt_name in {".", ".."}:
+        raise HTTPException(status_code=400, detail="Invalid prompt name.")
+    if not prompt_name.endswith(".txt"):
+        prompt_name = f"{prompt_name}.txt"
+
+    if prompt_name.startswith(".") or prompt_name.strip(".") == "":
+        raise HTTPException(status_code=400, detail="Invalid prompt name.")
+
+    prompt_content = req.content.strip()
+    if not prompt_content:
+        raise HTTPException(status_code=400, detail="Prompt content is required.")
+
+    PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
+    prompt_path = PROMPTS_DIR / prompt_name
+    resolved_prompt_path = prompt_path.resolve()
+    if not resolved_prompt_path.is_relative_to(PROMPTS_DIR.resolve()):
+        raise HTTPException(status_code=400, detail="Invalid prompt name.")
+    if resolved_prompt_path.exists():
+        raise HTTPException(status_code=409, detail=f"Prompt file '{prompt_name}' already exists.")
+
+    try:
+        resolved_prompt_path.write_text(req.content, encoding="utf-8")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save prompt: {e}")
+
+    return {"prompt_name": prompt_name}
 
 
 @app.post("/api/diff")
@@ -94,7 +142,10 @@ async def run_review_endpoint(req: ReviewRequest):
         review_json=result["review"]
     )
     
-    logs.add_log_dual(log_entry, mongo_log_entry)
+    log_status = logs.add_log_dual(log_entry, mongo_log_entry)
+    
+    # Add log storage status to response
+    result["log_status"] = log_status
 
     return result
 

@@ -24,8 +24,6 @@ def get_collection():
         _client = MongoClient(
             MONGODB_URI,
             serverSelectionTimeoutMS=5000,  # 5 second timeout
-            connectTimeoutMS=10000,
-            socketTimeoutMS=10000,
         )
         # Test connection
         _client.admin.command('ping')
@@ -47,6 +45,26 @@ def is_connected() -> bool:
         return True
     except Exception:
         return False
+
+
+def validate_connection() -> tuple[bool, str]:
+    """Validate MongoDB connection at startup. Returns (is_connected, message)."""
+    if not MONGODB_URI:
+        return False, "MONGODB_URI environment variable is not set"
+    
+    try:
+        test_client = MongoClient(
+            MONGODB_URI,
+            serverSelectionTimeoutMS=5000,
+        )
+        # Test connection
+        test_client.admin.command('ping')
+        test_client.close()
+        return True, "MongoDB connection validated successfully"
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        return False, f"Failed to connect to MongoDB: {e}"
+    except Exception as e:
+        return False, f"Unexpected error validating MongoDB: {e}"
 
 
 def close_connection():

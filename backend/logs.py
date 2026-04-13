@@ -28,13 +28,38 @@ def add_log_to_mongo(mongo_entry: MongoLogEntry) -> bool:
         return False
 
 
-def add_log_dual(in_memory_entry: LogEntry, mongo_entry: MongoLogEntry) -> None:
-    """Add log to both in-memory and MongoDB storage."""
+def add_log_dual(in_memory_entry: LogEntry, mongo_entry: MongoLogEntry) -> dict:
+    """Add log to both in-memory and MongoDB storage.
+    Returns dict with keys:
+    - 'success': bool indicating overall success
+    - 'in_memory': bool indicating in-memory storage success
+    - 'mongodb': bool indicating MongoDB storage success
+    - 'message': str with details
+    """
+    status = {
+        'success': False,
+        'in_memory': False,
+        'mongodb': False,
+        'message': ''
+    }
+    
     # Always add to in-memory (fallback)
-    add_log(in_memory_entry)
+    try:
+        add_log(in_memory_entry)
+        status['in_memory'] = True
+    except Exception as e:
+        status['message'] = f"Failed to store log in-memory: {e}"
+        return status
     
     # Try to add to MongoDB
-    add_log_to_mongo(mongo_entry)
+    mongodb_success = add_log_to_mongo(mongo_entry)
+    status['mongodb'] = mongodb_success
+    
+    # Overall success: in-memory + ideally MongoDB, but in-memory is minimum
+    status['success'] = True
+    status['message'] = f"In-memory: true, MongoDB: {mongodb_success}"
+    
+    return status
 
 
 def get_logs() -> list[dict]:

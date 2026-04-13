@@ -2,6 +2,13 @@ const API_BASE = "http://localhost:8000";
 
 const mrUrlInput = document.getElementById("mr-url");
 const promptSelect = document.getElementById("prompt-select");
+const promptTabSelect = document.getElementById("prompt-tab-select");
+const promptTabCustom = document.getElementById("prompt-tab-custom");
+const promptPanelSelect = document.getElementById("prompt-panel-select");
+const promptPanelCustom = document.getElementById("prompt-panel-custom");
+const customPromptNameInput = document.getElementById("custom-prompt-name");
+const customPromptContentInput = document.getElementById("custom-prompt-content");
+const btnSavePrompt = document.getElementById("btn-save-prompt");
 const btnFetchDiff = document.getElementById("btn-fetch-diff");
 const btnRunReview = document.getElementById("btn-run-review");
 const errorBanner = document.getElementById("error-banner");
@@ -36,6 +43,7 @@ function setLoading(on) {
     loadingEl.hidden = !on;
     btnFetchDiff.disabled = on;
     btnRunReview.disabled = on;
+    btnSavePrompt.disabled = on;
 }
 
 function escapeHtml(text) {
@@ -44,10 +52,25 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// --- Fetch helper ---
+function fetchWithTimeout(url, options = {}) {
+    return fetch(url, options);
+}
+
 // --- Load prompts ---
-async function loadPrompts() {
+function setActivePromptTab(tab) {
+    const selectActive = tab === "select";
+    promptTabSelect.classList.toggle("active", selectActive);
+    promptTabCustom.classList.toggle("active", !selectActive);
+    promptPanelSelect.hidden = !selectActive;
+    promptPanelCustom.hidden = selectActive;
+}
+
+async function loadPrompts(selectedPrompt = null) {
+    console.log("Loading prompts from backend...");
     try {
-        const res = await fetch(`${API_BASE}/api/prompts`);
+        const res = await fetchWithTimeout(`${API_BASE}/api/prompts`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         promptSelect.innerHTML = "";
         if (data.prompts.length === 0) {
@@ -60,7 +83,13 @@ async function loadPrompts() {
             opt.textContent = p;
             promptSelect.appendChild(opt);
         }
+        if (selectedPrompt && data.prompts.includes(selectedPrompt)) {
+            promptSelect.value = selectedPrompt;
+        }
+        console.log(`Loaded ${data.prompts.length} prompts`);
     } catch (e) {
+        console.error("Failed to load prompts:", e.message);
+        promptSelect.innerHTML = '<option value="">Error loading prompts</option>';
         showError("Failed to load prompts: " + e.message);
     }
 }
@@ -76,7 +105,7 @@ btnFetchDiff.addEventListener("click", async () => {
 
     setLoading(true);
     try {
-        const res = await fetch(`${API_BASE}/api/diff`, {
+        const res = await fetchWithTimeout(`${API_BASE}/api/diff`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ mr_url: mrUrl }),
@@ -94,6 +123,7 @@ btnFetchDiff.addEventListener("click", async () => {
     } finally {
         setLoading(false);
     }
+
 });
 
 // --- Run review ---
@@ -112,7 +142,7 @@ btnRunReview.addEventListener("click", async () => {
 
     setLoading(true);
     try {
-        const res = await fetch(`${API_BASE}/api/review`, {
+        const res = await fetchWithTimeout(`${API_BASE}/api/review`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ mr_url: mrUrl, prompt_name: promptName }),
@@ -141,6 +171,45 @@ btnRunReview.addEventListener("click", async () => {
 
         // Refresh logs
         await loadLogs();
+    } catch (e) {
+        showError(e.message);
+    } finally {
+        setLoading(false);
+    }
+
+});
+
+promptTabSelect.addEventListener("click", () => setActivePromptTab("select"));
+promptTabCustom.addEventListener("click", () => setActivePromptTab("custom"));
+
+btnSavePrompt.addEventListener("click", async () => {
+    clearError();
+    const promptName = customPromptNameInput.value.trim();
+    const promptContent = customPromptContentInput.value.trim();
+
+    if (!promptName) {
+        showError("Please enter a prompt filename.");
+        return;
+    }
+    if (!promptContent) {
+        showError("Please enter prompt content.");
+        return;
+    }
+
+    setLoading(true);
+    try {
+        const res = await fetchWithTimeout(`${API_BASE}/api/prompts`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt_name: promptName, content: promptContent }),
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || "Failed to save prompt");
+        }
+        const data = await res.json();
+        await loadPrompts(data.prompt_name);
+        setActivePromptTab("select");
     } catch (e) {
         showError(e.message);
     } finally {
@@ -261,35 +330,71 @@ function renderDiff(diffData, comments) {
 }
 
 // --- Logs ---
+function getLogTimeSeconds(log) {
+    if (typeof log.time_seconds === "number") {
+        return log.time_seconds;
+    }
+    if (typeof log.elapsed_ms === "number") {
+        return Number((log.elapsed_ms / 1000).toFixed(2));
+    }
+    return "—";
+}
+
+function getLogSummary(log) {
+    if (typeof log.summary === "string" && log.summary.length > 0) {
+        return log.summary;
+    }
+    if (
+        log.review_json &&
+        typeof log.review_json === "object" &&
+        typeof log.review_json.summary === "string"
+    ) {
+        return log.review_json.summary;
+    }
+    return "—";
+}
+
 async function loadLogs() {
+    console.log("Loading logs from backend...");
     try {
-        const res = await fetch(`${API_BASE}/api/logs`);
+        const res = await fetchWithTimeout(`${API_BASE}/api/logs`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.logs.length === 0) {
             logsBody.innerHTML = '<tr><td colspan="6" class="empty-logs">No reviews yet.</td></tr>';
+            console.log("No logs available");
             return;
         }
         logsBody.innerHTML = "";
         for (const log of data.logs.reverse()) {
+            const timestamp = typeof log.timestamp === "string" ? log.timestamp : "—";
+            const promptName = typeof log.prompt_name === "string" ? log.prompt_name : "—";
+            const mrUrl = typeof log.mr_url === "string" ? log.mr_url : "—";
+            const tokens =
+                typeof log.tokens_used === "number" ? log.tokens_used.toLocaleString() : "—";
+            const timeSeconds = getLogTimeSeconds(log);
+            const summary = getLogSummary(log);
+
             const tr = document.createElement("tr");
             tr.innerHTML =
-                `<td title="${escapeHtml(log.timestamp)}">${escapeHtml(log.timestamp)}</td>` +
-                `<td>${escapeHtml(log.prompt_name)}</td>` +
-                `<td title="${escapeHtml(log.mr_url)}">${escapeHtml(log.mr_url)}</td>` +
-                `<td>${log.tokens_used.toLocaleString()}</td>` +
-                `<td>${log.time_seconds}</td>` +
-                `<td title="${escapeHtml(log.summary)}">${escapeHtml(log.summary)}</td>`;
+                `<td title="${escapeHtml(timestamp)}">${escapeHtml(timestamp)}</td>` +
+                `<td>${escapeHtml(promptName)}</td>` +
+                `<td title="${escapeHtml(mrUrl)}">${escapeHtml(mrUrl)}</td>` +
+                `<td>${tokens}</td>` +
+                `<td>${escapeHtml(String(timeSeconds))}</td>` +
+                `<td title="${escapeHtml(summary)}">${escapeHtml(summary)}</td>`;
             logsBody.appendChild(tr);
         }
+        console.log(`Loaded ${data.logs.length} logs`);
     } catch (e) {
-        console.error("Failed to load logs:", e);
+        console.error("Failed to load logs:", e.message);
+        logsBody.innerHTML = '<tr><td colspan="6" class="error-logs">Error loading logs: ' + escapeHtml(e.message) + '</td></tr>';
     }
 }
-
 // --- CSV ---
 btnDownloadCsv.addEventListener("click", async () => {
     try {
-        const res = await fetch(`${API_BASE}/api/logs/csv`);
+        const res = await fetchWithTimeout(`${API_BASE}/api/logs/csv`);
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -304,7 +409,7 @@ btnDownloadCsv.addEventListener("click", async () => {
 
 btnCopyCsv.addEventListener("click", async () => {
     try {
-        const res = await fetch(`${API_BASE}/api/logs/csv`);
+        const res = await fetchWithTimeout(`${API_BASE}/api/logs/csv`);
         const text = await res.text();
         await navigator.clipboard.writeText(text);
         btnCopyCsv.textContent = "Copied!";
@@ -315,5 +420,12 @@ btnCopyCsv.addEventListener("click", async () => {
 });
 
 // --- Init ---
-loadPrompts();
-loadLogs();
+console.log("SANDMARK initializing...");
+setActivePromptTab("select");
+// Load prompts and logs
+Promise.all([
+    loadPrompts().catch(e => console.error("Prompt load failed:", e)),
+    loadLogs().catch(e => console.error("Logs load failed:", e))
+]).finally(() => {
+    console.log("SANDMARK initialization complete");
+});

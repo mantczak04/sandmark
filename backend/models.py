@@ -18,6 +18,11 @@ class ReviewRequest(BaseModel):
     prompt_name: str
 
 
+class CreatePromptRequest(BaseModel):
+    prompt_name: str
+    content: str
+
+
 class DiffRequest(BaseModel):
     mr_url: str
 
